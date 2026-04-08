@@ -388,7 +388,6 @@ temperatura(toamna, 10, 20).
 temperatura(vara, 20, 45).
 temperatura(toate, -50, 50).
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Predicate utilitare
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -396,7 +395,8 @@ temperatura(toate, -50, 50).
 potrivita_temperatura(H, T) :-
     haina(H, _, Sezon),
     temperatura(Sezon, Min, Max),
-    T >= Min, T =< Max.
+    T >= Min,
+    T =< Max.
 
 potrivita_precipitatii(H, ploaie) :-
     \+ (haina(H, incaltaminte, _), H = sandale), !.
@@ -415,15 +415,19 @@ stile_ok(H1, H2) :-
 asortare(H1, H2) :-
     culoare(H1, C1),
     culoare(H2, C2),
-    (C1 = C2 ; C1 = alb ; C2 = alb ; C1 = negru ; C2 = negru).
+    ( C1 = C2
+    ; C1 = alb
+    ; C2 = alb
+    ; C1 = negru
+    ; C2 = negru
+    ).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Conditii
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 %% Alege Outerwear
-
 
 alege_outerwear(T, Prec, nimic) :-
     T >= 23,
@@ -438,10 +442,11 @@ alege_outerwear(T, Prec, Out) :-
 
 %% Alege Accesoriu
 
-
 alege_accesoriu(_, sport, nimic) :- !.
 
-alege_accesoriu(T, casual, nimic) :- T >= 28, !.
+alege_accesoriu(T, casual, nimic) :-
+    T >= 28, !.
+
 alege_accesoriu(_, casual, Acc) :-
     haina(Acc, accesoriu, _),
     stil(Acc, casual).
@@ -454,56 +459,116 @@ alege_accesoriu(_, business, Acc) :-
     haina(Acc, accesoriu, _),
     stil(Acc, elegant).
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Recomandare finală
+%% Predicate pentru excluderi
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-recomanda_tinuta(T, Ev, Prec, PreferC, PreferStil,
+%% Afiseaza toate hainele dintr-o categorie
+afiseaza_haine_din_categorie(Categorie) :-
+    writeln('Haine disponibile:'),
+    forall(
+        haina(H, Categorie, _),
+        writeln(H)
+    ).
+
+%% Colecteaza recursiv hainele pe care utilizatorul NU vrea sa le poarte
+colecteaza_interdictii(ListaFinala) :-
+    colecteaza_interdictii([], ListaFinala).
+
+colecteaza_interdictii(ListaCurenta, ListaFinala) :-
+    writeln('Alege categoria (top, bottom, incaltaminte, accesoriu) sau stop:'),
+    read(Cat),
+    (
+        Cat = stop ->
+            ListaFinala = ListaCurenta
+    ;
+        afiseaza_haine_din_categorie(Cat),
+        writeln('Scrie EXACT haina pe care NU vrei sa o porti:'),
+        read(H),
+        (
+            haina(H, Cat, _) ->
+                colecteaza_interdictii([H | ListaCurenta], ListaFinala)
+        ;
+            writeln('Haina invalida pentru aceasta categorie. Incearca din nou.'),
+            colecteaza_interdictii(ListaCurenta, ListaFinala)
+        )
+    ).
+
+%% Verifica daca o haina este permisa
+permis(H, ListaInterzisa) :-
+    \+ member(H, ListaInterzisa).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Recomandare finala 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+recomanda_tinuta(T, Ev, Prec, PreferC, PreferStil, Interzise,
                  tinuta(Top, Bottom, Inc, Out, Acc)) :-
 
     haina(Top, top, _),
+    permis(Top, Interzise),
     potrivita_temperatura(Top, T),
     stil(Top, ST1),
     (PreferStil = orice ; ST1 = PreferStil),
 
     haina(Bottom, bottom, _),
+    permis(Bottom, Interzise),
     potrivita_temperatura(Bottom, T),
     stile_ok(Top, Bottom),
     asortare(Top, Bottom),
 
     haina(Inc, incaltaminte, _),
+    permis(Inc, Interzise),
     potrivita_temperatura(Inc, T),
     stile_ok(Top, Inc),
 
     alege_outerwear(T, Prec, Out),
+    (Out = nimic ; permis(Out, Interzise)),
 
     alege_accesoriu(T, Ev, Acc),
-    (Acc = nimic ; stile_ok(Top, Acc)),
+    (
+        Acc = nimic
+    ;
+        ( permis(Acc, Interzise),
+          stile_ok(Top, Acc)
+        )
+    ),
 
     (
-        PreferC = orice ;
-        culoare(Top, PreferC) ;
-        culoare(Bottom, PreferC) ;
-        culoare(Inc, PreferC) ;
-        (Out \= nimic, culoare(Out, PreferC)) ;
+        PreferC = orice
+    ;
+        culoare(Top, PreferC)
+    ;
+        culoare(Bottom, PreferC)
+    ;
+        culoare(Inc, PreferC)
+    ;
+        (Out \= nimic, culoare(Out, PreferC))
+    ;
         (Acc \= nimic, culoare(Acc, PreferC))
     ).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Sistem Expert Interactiv
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 start :-
-    writeln('Temperatura (număr):'), read(T),
+    writeln('Temperatura (numar):'), read(T),
     writeln('Eveniment (casual, business, elegant, sport):'), read(Ev),
-    writeln('Precipitații (soare, ploaie, ninsoare, inorat):'), read(Prec),
-    writeln('Preferință culoare (sau orice):'), read(PC),
-    writeln('Preferință stil (sau orice):'), read(PS),
-
-    (   recomanda_tinuta(T, Ev, Prec, PC, PS, Tinuta),
+    writeln('Precipitatii (soare, ploaie, ninsoare, inorat):'), read(Prec),
+    writeln('Preferinta culoare (alb, negru, rosu, albastru, verde, gri, bej, maro sau orice):'),read(PC),
+    writeln('Preferinta stil (casual, elegant, sport, smart_casual, business sau orice):'),read(PS),
+    writeln('Configureaza hainele pe care NU vrei sa le porti:'),
+    colecteaza_interdictii(Interzise),
+    (
+        recomanda_tinuta(T, Ev, Prec, PC, PS, Interzise, Tinuta),
         writeln('------------------------------------------------'),
-        writeln('Ținută recomandată:'),
+        writeln('Tinuta recomandata:'),
         writeln(Tinuta),
         writeln('------------------------------------------------')
-    ;   writeln('Nu există combinație potrivită.')
+    ;
+        writeln('Nu exista combinatie potrivita.')
     ).
